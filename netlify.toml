@@ -1,3 +1,3 @@
 [build]
-  command = "node index.js" # or whatever your build command is
+  command = "npm run" # or whatever your build command is
   functions = "functions"
