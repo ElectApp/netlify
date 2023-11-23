@@ -3,6 +3,7 @@ exports.handler = async function (event, context) {
     try {
       // Parse JSON data from the request body
       const requestData = JSON.parse(event.body);
+      console.log("got data: ", event.body);
   
       // Perform actions with the received data
       // ...
