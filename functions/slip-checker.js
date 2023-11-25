@@ -189,7 +189,7 @@ app.post('/.netlify/functions/slip-checker', (req, res) => {
   // Accessing a specific header
   const userAgent = headers['user-agent'];
   if (userAgent.startsWith("LineBotWebhook")) {
-    httpResp(res, 'OK', 200);
+    //httpResp(res, 'OK', 200);
 
     //Reply to LINE
     const events = req.body.events;
@@ -202,11 +202,14 @@ app.post('/.netlify/functions/slip-checker', (req, res) => {
       checkSlipFromImageUrl(imgUrl).then(result => {
         console.log('Result:', result);
         //httpResp(res, data);
+        httpResp(res, result.message, 200);
         //Reply
         replyText(data.replyToken, result.message);
       }).catch(error => {
         console.error('Error:', error.message);
       });
+    }else {
+      httpResp(res, 'We support a image message only.', 200);
     }
   } else {
     httpResp(res, 'We support request from LineBotWebhook only.', 500);
