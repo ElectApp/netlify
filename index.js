@@ -1,6 +1,7 @@
 const express = require('express');
-const bodyParser = require('body-parser');
+//const bodyParser = require('body-parser');
 
+const https = require("https");
 const axios = require('axios');
 const QrCode = require('qrcode-reader');
 const Jimp = require('jimp');
@@ -23,8 +24,8 @@ const SLIPOK_QUATA_URL = SLIPOK_CHECK_URL + "/quota";
 
 //Initial
 const app = express();
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 // Set the timezone to 'Asia/Bangkok'
 moment.tz.setDefault('Asia/Bangkok');
@@ -85,7 +86,7 @@ async function checkQuata() {
     } else {
       console.error('Error check quata:', error.message);
       throw new Error(error.message);
-    }    
+    }
   }
 }
 
@@ -155,45 +156,60 @@ async function checkSlipFromImageUrl(imageUrl) {
   }
 }
 
+function replyText(replyToken, text) {
+  axios.post("https://api.line.me/v2/bot/message/reply",
+    {
+      replyToken: replyToken,
+      messages: [
+        {
+          type: "text",
+          text: text,
+        }
+      ]
+    },
+    {
+      headers: {
+        Authorization: LINE_BEARER_TOKEN,
+        'Content-Type': 'application/json',
+      },
+    })
+    .then((res) => {
+      console.log(res.data);
+    })
+    .catch((err) => {
+      console.error("Error reply:", err.message);
+    });
+}
+
 app.get('/', (req, res) => {
   res.send('Hello, World!');
 });
 
-app.post('/slip-checker/test', (req, res) => {
+app.post('/slip-checker', (req, res) => {
   console.log(req.body);
   // Accessing the entire headers object
   const headers = req.headers;
   // Accessing a specific header
   const userAgent = headers['user-agent'];
   if (userAgent.startsWith("LineBotWebhook")) {
-    const data = req.body.events[0];
+    httpResp(res, 'OK', 200);
+
+    //Reply to LINE
+    const events = req.body.events;
     //httpResp(res, data);
-    if (data.type == "message") {
-      if (data.message.type == "image") {
-        //Try read QR code
-        const imgUrl = 'https://api-data.line.me/v2/bot/message/' + data.message.id + '/content';
-        console.log("Reading QR code from:", imgUrl);
-        checkSlipFromImageUrl(imgUrl).then(result => {
-          console.log('Result:', result);
-          //httpResp(res, data);
-          //Reply to LINE user
-          res
-            .set('Content-Type', 'application/json')
-            .set('Authorization', LINE_BEARER_TOKEN)
-            .json({
-              replyToken: data.replyToken,
-              message: {
-                type: "text",
-                text: result.message
-              }
-            });
-        }).catch(error => {
-          console.error('Error:', error.message);
-          httpResp(res, error.message, 500);
-        });
-      }
-    } else {
-      httpResp(res, 'We support message event only.', 500);
+    if (events && events.length>0 && events[0].type === "message" && events[0].message.type === "image") {
+      const data = events[0];
+      //Try read QR code
+      const imgUrl = 'https://api-data.line.me/v2/bot/message/' + data.message.id + '/content';
+      console.log("Reading QR code from:", imgUrl);
+      checkSlipFromImageUrl(imgUrl).then(result => {
+        console.log('Result:', result);
+        //httpResp(res, data);
+        //Reply
+        replyText(data.replyToken, result.message);
+      }).catch(error => {
+        console.error('Error:', error.message);
+      });
     }
   } else {
     httpResp(res, 'We support request from LineBotWebhook only.', 500);
@@ -204,7 +220,7 @@ function httpResp(res, data, code = 200) {
   res.status(code).json({ success: code == 200, data: data });
 }
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 2023;
 app.listen(PORT, () => {
   console.log('Server is running on port', PORT);
 });
