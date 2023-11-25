@@ -16,7 +16,7 @@ const LINE_BEARER_TOKEN = "Bearer " + LINE_ACCESS_TOKEN;
 
 //- SlipOK
 const SLIPOK_BRANCH_ID = "12976";
-const SLIPOK_API_KEY = "SLIPOKL3J6SC";
+const SLIPOK_API_KEY = "SLIPOKL3J6SCA";
 const SLIPOK_HOST = "https://api.slipok.com/api/line/apikey/";
 const SLIPOK_CHECK_URL = SLIPOK_HOST + SLIPOK_BRANCH_ID;
 const SLIPOK_QUATA_URL = SLIPOK_CHECK_URL + "/quota";
@@ -205,8 +205,8 @@ function httpResp(res, data, code = 200) {
 }
 
 const PORT = process.env.PORT || 3000;
-// app.listen(PORT, () => {
-//   console.log('Server is running on port', PORT);
-// });
+app.listen(PORT, () => {
+  console.log('Server is running on port', PORT);
+});
 
-checkQuata();
+// checkQuata();
