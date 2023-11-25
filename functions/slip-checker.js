@@ -65,7 +65,7 @@ async function readQrFromImageUrl(imageUrl) {
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-app.post('/slip-checker/test', (req, res) => {
+app.post('/.netlify/functions/slip-checker', (req, res) => {
   console.log(req.body);
   // Accessing the entire headers object
   const headers = req.headers;
