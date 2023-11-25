@@ -158,6 +158,7 @@ async function checkSlipFromImageUrl(imageUrl) {
 }
 
 function replyText(replyToken, text) {
+  console.log("Reply...", text);
   axios.post("https://api.line.me/v2/bot/message/reply",
     {
       replyToken: replyToken,
@@ -175,10 +176,10 @@ function replyText(replyToken, text) {
       },
     })
     .then((res) => {
-      console.log("Reply:", res.data);
+      console.log(res.data);
     })
     .catch((err) => {
-      console.error("Error reply:", err.message);
+      console.error("Error:", err.message);
     });
 }
 
