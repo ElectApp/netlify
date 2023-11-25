@@ -158,7 +158,7 @@ async function checkSlipFromImageUrl(imageUrl) {
 }
 
 function replyText(replyToken, text) {
-  console.log("Reply...", text);
+  //axios don't work on Netlify.
   axios.post("https://api.line.me/v2/bot/message/reply",
     {
       replyToken: replyToken,

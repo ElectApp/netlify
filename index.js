@@ -1,7 +1,6 @@
 const express = require('express');
 //const bodyParser = require('body-parser');
 
-const https = require("https");
 const axios = require('axios');
 const QrCode = require('qrcode-reader');
 const Jimp = require('jimp');
@@ -11,8 +10,13 @@ const moment = require('moment-timezone');
 
 //Constant
 //- LINE API
-const LINE_ACCESS_TOKEN = "7wFj1n0TuAteJ+H+k3Bvm+u4VKIIgmUg6+eZBjdQzSXVZrIzQ35HJchRWjNqXD8N33vPbf9DpAg7u/lzRrgpq0MXKYkneoXoKA7YgGEljY4d1/eVVK2G0ORHJcZmFI9icLD6HvE5dKFZgBLScm9w6gdB04t89/1O/w1cDnyilFU=";
-const LINE_SECRET = "5b2d1f0542770a2c32082faa39974866";
+//-- Slip Checker
+// const LINE_ACCESS_TOKEN = "7wFj1n0TuAteJ+H+k3Bvm+u4VKIIgmUg6+eZBjdQzSXVZrIzQ35HJchRWjNqXD8N33vPbf9DpAg7u/lzRrgpq0MXKYkneoXoKA7YgGEljY4d1/eVVK2G0ORHJcZmFI9icLD6HvE5dKFZgBLScm9w6gdB04t89/1O/w1cDnyilFU=";
+// const LINE_SECRET = "5b2d1f0542770a2c32082faa39974866";
+//-- KK Food
+const LINE_ACCESS_TOKEN = "u9+wYk6Ft9Q8dT6Gbj+raZ7Ii+7maxXlTeDLbTPlSwc/jt5wStwDwy0LZe8bYhG9C5Y9zSfdFG5eymqf8vlT6jRnFE6UhUmAdmK6TYkjdCJuwPPj7vu040NiKK9Ms7HjTNBPnBh1k77zoZVcS4kn2gdB04t89/1O/w1cDnyilFU=";
+const LINE_SECRET = "486b1d68393df642b534ad3bf08a5782";
+
 const LINE_BEARER_TOKEN = "Bearer " + LINE_ACCESS_TOKEN;
 
 //- SlipOK
@@ -21,6 +25,9 @@ const SLIPOK_API_KEY = "SLIPOKL3J6SCA";
 const SLIPOK_HOST = "https://api.slipok.com/api/line/apikey/";
 const SLIPOK_CHECK_URL = SLIPOK_HOST + SLIPOK_BRANCH_ID;
 const SLIPOK_QUATA_URL = SLIPOK_CHECK_URL + "/quota";
+
+//- Server
+const PORT = 2022;
 
 //Initial
 const app = express();
@@ -95,6 +102,7 @@ async function checkSlip(qrString) {
     const res = await axios.post(SLIPOK_CHECK_URL,
       {
         data: qrString,
+        log: true //ระบุเป็น true ถ้าต้องการเช็คธนาคารรับเงินที่ผูกไว้กับสาขา API และเก็บยอดไว้ดูใน Line LIFF ของร้านค้าได้ ถ้าหากไม่ส่งจะเป็นการตรวจสลิปเฉย ๆ ไม่มีการเก็บค่า
       },
       {
         headers: {
@@ -145,7 +153,7 @@ async function checkSlipFromImageUrl(imageUrl) {
         //OK
         let tstamp = moment(slip.transTimestamp);
         res.success = true;
-        res.message = "✅ สลิปถูกต้องจำนวนเงิน " + numeral(slip.amount).format('0,0.00') + " บาท";
+        res.message = "✅ สลิปถูกต้อง จำนวนเงิน " + numeral(slip.amount).format('0,0.00') + " บาท";
         res.message += " ชำระเมื่อ " + tstamp.format("DD/MM/YYYY HH:mm") + " (" + tstamp.fromNow() + ")";
       }
     }
@@ -209,6 +217,7 @@ app.post('/slip-checker', (req, res) => {
         replyText(data.replyToken, result.message);
       }).catch(error => {
         console.error('Error:', error.message);
+        httpResp(res, error.message, 500);
       });
     } else {
       httpResp(res, 'We support a image message only.');
@@ -222,9 +231,12 @@ function httpResp(res, data, code = 200) {
   res.status(code).json({ success: code == 200, data: data });
 }
 
-const PORT = process.env.PORT || 2023;
+//Start server
 app.listen(PORT, () => {
-  console.log('Server is running on port', PORT);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
 
-// checkQuata();
+module.exports = {
+  app,
+  PORT
+}
