@@ -192,7 +192,7 @@ app.post('/slip-checker', (req, res) => {
   // Accessing a specific header
   const userAgent = headers['user-agent'];
   if (userAgent.startsWith("LineBotWebhook")) {
-    httpResp(res, 'OK', 200);
+    //httpResp(res, 'OK', 200);
 
     //Reply to LINE
     const events = req.body.events;
@@ -204,12 +204,14 @@ app.post('/slip-checker', (req, res) => {
       console.log("Reading QR code from:", imgUrl);
       checkSlipFromImageUrl(imgUrl).then(result => {
         console.log('Result:', result);
-        //httpResp(res, data);
+        httpResp(res, result.message);
         //Reply
         replyText(data.replyToken, result.message);
       }).catch(error => {
         console.error('Error:', error.message);
       });
+    } else {
+      httpResp(res, 'We support a image message only.');
     }
   } else {
     httpResp(res, 'We support request from LineBotWebhook only.', 500);

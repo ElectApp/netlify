@@ -201,15 +201,14 @@ app.post('/.netlify/functions/slip-checker', (req, res) => {
       console.log("Reading QR code from:", imgUrl);
       checkSlipFromImageUrl(imgUrl).then(result => {
         console.log('Result:', result);
-        //httpResp(res, data);
-        httpResp(res, result.message, 200);
+        httpResp(res, result.message);
         //Reply
         replyText(data.replyToken, result.message);
       }).catch(error => {
         console.error('Error:', error.message);
       });
     }else {
-      httpResp(res, 'We support a image message only.', 200);
+      httpResp(res, 'We support a image message only.');
     }
   } else {
     httpResp(res, 'We support request from LineBotWebhook only.', 500);
