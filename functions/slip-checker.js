@@ -4,23 +4,42 @@ const express = require('express');
 const serverless = require('serverless-http');
 const bodyParser = require('body-parser');
 
-const request = require('request');
 const axios = require('axios');
 const QrCode = require('qrcode-reader');
 const Jimp = require('jimp');
 
-//Initial
-const app = express();
+const numeral = require('numeral');
+const moment = require('moment-timezone');
 
+//Constant
 //- LINE API
 const LINE_ACCESS_TOKEN = "7wFj1n0TuAteJ+H+k3Bvm+u4VKIIgmUg6+eZBjdQzSXVZrIzQ35HJchRWjNqXD8N33vPbf9DpAg7u/lzRrgpq0MXKYkneoXoKA7YgGEljY4d1/eVVK2G0ORHJcZmFI9icLD6HvE5dKFZgBLScm9w6gdB04t89/1O/w1cDnyilFU=";
 const LINE_SECRET = "5b2d1f0542770a2c32082faa39974866";
+const LINE_BEARER_TOKEN = "Bearer " + LINE_ACCESS_TOKEN;
 
+//- SlipOK
+const SLIPOK_BRANCH_ID = "12976";
+const SLIPOK_API_KEY = "SLIPOKL3J6SC";
+const SLIPOK_HOST = "https://api.slipok.com/api/line/apikey/";
+const SLIPOK_CHECK_URL = SLIPOK_HOST + SLIPOK_BRANCH_ID;
+const SLIPOK_QUATA_URL = SLIPOK_CHECK_URL + "/quota";
+
+//Initial
+const app = express();
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+
+// Set the timezone to 'Asia/Bangkok'
+moment.tz.setDefault('Asia/Bangkok');
+// Set Local format
+moment.locale('th');
+
+// Function to download the image using axios
 async function downloadImage(url) {
   try {
     const response = await axios.get(url, {
       headers: {
-        'Authorization': "Bearer " + LINE_ACCESS_TOKEN,
+        'Authorization': LINE_BEARER_TOKEN,
         'Content-Type': 'application/json'
       }, responseType: 'arraybuffer'
     });
@@ -61,6 +80,84 @@ async function readQrFromImageUrl(imageUrl) {
   }
 }
 
+async function checkQuata() {
+  try {
+    const res = await axios.get(SLIPOK_QUATA_URL,
+      {
+        headers: {
+          'x-authorization': SLIPOK_API_KEY,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    console.log(res.data);
+    return res.data.data;
+  } catch (error) {
+    const edata = error.response.data;
+    if (edata) {
+      console.error('Error check quata:', edata);
+      return edata;
+    } else {
+      console.error('Error check quata:', error.message);
+      throw new Error(error.message);
+    }
+  }
+}
+
+async function checkSlip(qrString) {
+  try {
+    const res = await axios.post(SLIPOK_CHECK_URL,
+      {
+        data: qrString,
+      },
+      {
+        headers: {
+          'x-authorization': SLIPOK_API_KEY,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    console.log(res.data);
+    return res.data.data;
+  } catch (error) {
+    const edata = error.response.data;
+    if (edata) {
+      console.error('Error check slip:', edata);
+      return edata;
+    } else {
+      console.error('Error check slip:', error.message);
+      throw new Error(error.message);
+    }
+  }
+}
+
+async function checkSlipFromImageUrl(imageUrl) {
+  try {
+    const qrCodeValue = await readQrFromImageUrl(imageUrl);
+    const quota = await checkQuata();
+    let res = { success: false, qrCode: qrCodeValue };
+    if (quota.quota == 0) {
+      res.message = '😟 ระบบไม่สามารถตรวจสอบสลิปได้ เนื่องจากเกินโคต้าแล้ว';
+    } else {
+      const slip = await checkSlip(qrCodeValue);
+      if (slip.code > 0) {
+        //Error
+        res.message = '⚠️ ' + slip.message;
+      } else {
+        //OK
+        let tstamp = moment(slip.transTimestamp);
+        res.success = true;
+        res.message = "✅ สลิปถูกต้องจำนวนเงิน " + numeral(slip.amount).format('0,0.00') + " บาท";
+        res.message += " ชำระเมื่อ " + tstamp.format("DD/MM/YYYY HH:mm") + " (" + tstamp.fromNow() + ")";
+      }
+    }
+    return res;
+  } catch (error) {
+    //console.error('Error:', error.message);
+    throw error;
+  }
+}
+
 // Use body-parser middleware to parse JSON and URL-encoded data
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -79,10 +176,20 @@ app.post('/.netlify/functions/slip-checker', (req, res) => {
         //Try read QR code
         const imgUrl = 'https://api-data.line.me/v2/bot/message/' + data.message.id + '/content';
         console.log("Reading QR code from:", imgUrl);
-        readQrFromImageUrl(imgUrl).then(qrCodeValue => {
-          console.log('QR Code Value:', qrCodeValue);
-          //res.json({ susccess: true, message: qrCodeValue });
-          httpResp(res, { qrCode: qrCodeValue });
+        checkSlipFromImageUrl(imgUrl).then(result => {
+          console.log('Result:', result);
+          //httpResp(res, data);
+          //Reply to LINE user
+          res
+            .set('Content-Type', 'application/json')
+            .set('Authorization', LINE_BEARER_TOKEN)
+            .json({
+              replyToken: data.replyToken,
+              message: {
+                type: "text",
+                text: result.message
+              }
+            });
         }).catch(error => {
           console.error('Error:', error.message);
           httpResp(res, error.message, 500);
@@ -100,50 +207,4 @@ function httpResp(res, data, code = 200) {
   res.status(code).json({ success: code == 200, data: data });
 }
 
-function reply(reply_token) {
-  let headers = {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN
-  }
-  let body = JSON.stringify({
-    replyToken: reply_token,
-    messages: [{
-      type: 'text',
-      text: 'Hello'
-    }]
-  })
-  request.post({
-    url: 'https://api.line.me/v2/bot/message/reply',
-    headers: headers,
-    body: body
-  }, (err, res, body) => {
-    console.log('replay_status: ' + res.statusCode);
-  });
-}
-
 module.exports.handler = serverless(app);
-
-/*
-exports.handler = async function (event, context) {
-  try {
-    // Parse JSON data from the request body
-    const requestData = JSON.parse(event.body);
-    console.log("got data:", event.body);
-
-    // Perform actions with the received data
-    // ...
-
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: 'POST request received successfully', data: requestData }),
-    };
-  } catch (error) {
-    console.error("error:", error.message);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Internal Server Error', error: error.message }),
-    };
-  }
-};
-*/
